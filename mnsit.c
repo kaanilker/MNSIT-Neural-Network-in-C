@@ -24,10 +24,10 @@ int main () {
     FILE *etiketDosyasi;
     FILE *goruntuTestDosyasi;
     FILE *etiketTestDosyasi;
-    goruntuDosyasi = fopen("/home/kaanilker/vscode/C Projects/Dataset/train-images.idx3-ubyte", "rb");
-    etiketDosyasi = fopen("/home/kaanilker/vscode/C Projects/Dataset/train-labels.idx1-ubyte", "rb");
-    goruntuTestDosyasi = fopen("/home/kaanilker/vscode/C Projects/Dataset/t10k-images.idx3-ubyte", "rb");
-    etiketTestDosyasi = fopen("/home/kaanilker/vscode/C Projects/Dataset/t10k-labels.idx1-ubyte", "rb");
+    goruntuDosyasi = fopen("train-images.idx3-ubyte", "rb");
+    etiketDosyasi = fopen("train-labels.idx1-ubyte", "rb");
+    goruntuTestDosyasi = fopen("t10k-images.idx3-ubyte", "rb");
+    etiketTestDosyasi = fopen("t10k-labels.idx1-ubyte", "rb");
     
     // Sahte Okuma
     unsigned char sahteOkuma[16];
@@ -96,7 +96,7 @@ int main () {
     }
 
     // Yapay Nöronların Oluşturulması
-    float girdi[784];
+    /* float girdi[784]; Bu dizi ileride resim okuma eklendiğinde çalışacaktır. */
     float birinciKatman[128];
     float ikinciKatman[10];
 
