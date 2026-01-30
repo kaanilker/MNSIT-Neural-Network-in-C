@@ -66,7 +66,7 @@ After compilation, run the program using:
 - Learning rate: 0.01  
 - Epochs: 20  
 
-With these hyperparameters, the model typically achieves an accuracy between 90% and 95% on the test set. Results may vary slightly due to random weight initialization.
+With these hyperparameters, the model typically achieves an accuracy &96.02 on the test set. Results may vary slightly due to random weight initialization.
 
 ## Implementation Details
 
