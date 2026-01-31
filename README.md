@@ -39,13 +39,14 @@ The implementation depends only on standard C libraries:
 
 - stdio.h  
 - stdlib.h  
-- math.h  
+- math.h
+- opm.h 
 
 Since mathematical functions are used, the math library must be linked explicitly.
 
 Compile (Linux / Unix):
 
-    gcc mnsit.c -o mnsit -lm
+    gcc mnsit.c -o mnsit -lm -fopenmp
 
 ## Execution
 
@@ -66,7 +67,7 @@ After compilation, run the program using:
 - Learning rate: 0.01  
 - Epochs: 20  
 
-With these hyperparameters, the model typically achieves an accuracy &96.02 on the test set. Results may vary slightly due to random weight initialization.
+With these hyperparameters, the model typically achieves an accuracy %97.88 on the test set. Results may vary slightly due to random weight initialization.
 
 ## Implementation Details
 
