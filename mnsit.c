@@ -2,13 +2,29 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <omp.h>
 
-// Sigmoid Aktivasyon Fonksiyonu ve Türevi
+// Sigmoid ve ReLU Aktivasyon Fonksiyonu ve Türevi
 float sigmoid(float x) {
 return 1.0f / (1.0f + expf(-x));
 }
-float sigmoid_turev(float x) {
+float sigmoidTurev(float x) {
 return x*(1-x);
+}
+
+float relu(float x) {
+    if (x<=0) {
+        return 0;
+    } else {
+        return x;
+    }
+}
+float reluTurev(float x) {
+    if (x<=0) {
+        return 0;
+    } else {
+        return 1;
+    }
 }
 
 // Resimler ve Etiketlerin Matrisleri
@@ -31,13 +47,10 @@ int main () {
     
     // Sahte Okuma
     unsigned char sahteOkuma[16];
-    unsigned char sahteOkuma2[8];
-    unsigned char sahteOkuma3[16];
-    unsigned char sahteOkuma4[8];
     fread(sahteOkuma, 1,16, goruntuDosyasi);
-    fread(sahteOkuma2, 1, 8, etiketDosyasi);
-    fread(sahteOkuma3, 1,16, goruntuTestDosyasi);
-    fread(sahteOkuma4, 1, 8, etiketTestDosyasi);
+    fread(sahteOkuma, 1, 8, etiketDosyasi);
+    fread(sahteOkuma, 1,16, goruntuTestDosyasi);
+    fread(sahteOkuma, 1, 8, etiketTestDosyasi);
     
     // Dosyaların Okunup Değişken İçine Atanması
     for(int a=0; a<60000; a=a+1) {
@@ -78,21 +91,23 @@ int main () {
     // Ağırlık Matrislerinin Doldurulması
     for (int a=0; a<128; a=a+1) {
         for(int b=0; b<784; b=b+1) {
-            agirliklar1[a][b] = (float)rand() / (float)RAND_MAX -0.5;
+            float std = sqrtf(2.0f / 784.0f);
+            agirliklar1[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
         }
     }
     for (int a=0; a<10; a=a+1) {
         for(int b=0; b<128; b=b+1) {
-            agirliklar2[a][b] = (float)rand() / (float)RAND_MAX -0.5;
+            float std = sqrtf(2.0f / 784.0f);
+            agirliklar2[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
         }
     }
 
     // Bias Matrislerinin Doldurulması
     for (int a=0; a<128; a=a+1) {
-            bias1[a] = (float)rand() / (float)RAND_MAX -0.5;
+            bias1[a] = ((float)rand() / RAND_MAX - 0.5) * 0.01;
     }
     for (int a=0; a<10; a=a+1) {
-            bias2[a] = (float)rand() / (float)RAND_MAX -0.5;
+            bias2[a] = ((float)rand() / RAND_MAX - 0.5) * 0.01;
     }
 
     // Yapay Nöronların Oluşturulması
@@ -100,90 +115,95 @@ int main () {
     float birinciKatman[128];
     float ikinciKatman[10];
 
-    // Öğrenme Algoritması
+    // Model Hiperparametreleri
     #define epoch 20
-    #define learning_rate 0.01
-    for (int ep=0; ep<epoch; ep=ep+1) {
-        for (int a=0; a<60000; a=a+1) {
-            for (int c=0; c<128; c=c+1) {
+    #define learningRate 0.01
+    #define batchSize 64
+
+    // Öğrenme Algoritması
+    for (int a=0; a<epoch; a+=1) {
+        for (int b=0; b<60000; b+=1) {
+            for (int c=0; c<128; c+=1) {
                 float toplam = 0;
-                for(int b=0; b<784; b=b+1) {
-                    toplam = toplam + (resimler[a][b]*agirliklar1[c][b]);
+                for(int d=0; d<784; d+=1) {
+                    toplam += (resimler[b][d]*agirliklar1[c][d]);
                     }
-                toplam = toplam + bias1[c];
-                birinciKatman[c] = sigmoid(toplam);
+                toplam += bias1[c];
+                birinciKatman[c] = relu(toplam);
             }  
-            for (int d=0; d<10; d=d+1) {
+            for (int c=0; c<10; c+=1) {
                 float toplam = 0;
-                for(int e=0; e<128; e=e+1) {
-                    toplam = toplam + (birinciKatman[e]*agirliklar2[d][e]);
+                for(int d=0; d<128; d+=1) {
+                    toplam += (birinciKatman[d]*agirliklar2[c][d]);
                     }
-                toplam = toplam + bias2[d];
-                ikinciKatman[d] = sigmoid(toplam);
+                toplam += bias2[c];
+                ikinciKatman[c] = sigmoid(toplam);
             }
+
             int hedef[10] = {0,0,0,0,0,0,0,0,0,0};
-            hedef[etiketler[a]] = 1;
+            hedef[etiketler[b]] = 1;
             float hata1[10];
             float hata2[128];
-            for (int g=0; g<10; g=g+1) {
-                hata1[g] = hedef[g]-ikinciKatman[g];
-                hata1[g] = hata1[g]*sigmoid_turev(ikinciKatman[g]);
+
+            for (int c=0; c<10; c+=1) {
+                hata1[c] = hedef[c]-ikinciKatman[c];
+                hata1[c] = hata1[c]*sigmoidTurev(ikinciKatman[c]);
             }
-            for (int g=0; g<128; g=g+1) { 
+            for (int c=0; c<128; c+=1) { 
                 float toplam = 0;
-                for (int h=0; h<10; h=h+1) {
-                    toplam = toplam + hata1[h]*agirliklar2[h][g];
+                for (int d=0; d<10; d+=1) {
+                    toplam += hata1[d]*agirliklar2[d][c];
                 }
-                hata2[g] = toplam * sigmoid_turev(birinciKatman[g]);
+                hata2[c] = toplam * reluTurev(birinciKatman[c]);
             }
-            for (int i=0; i<128; i=i+1) {
-                for (int j=0; j<784; j=j+1) {
-                    agirliklar1[i][j] = agirliklar1[i][j] + (learning_rate *hata2[i] * resimler[a][j]);
+            for (int c=0; c<128; c+=1) {
+                for (int d=0; d<784; d+=1) {
+                    agirliklar1[c][d] += (learningRate *hata2[c] * resimler[b][d]);
                 }
-                bias1[i] = bias1[i] + learning_rate * hata2[i];
+                bias1[c] += learningRate * hata2[c];
             }
-            for (int i=0; i<10; i=i+1) {
-                for (int j=0; j<128; j=j+1) {
-                    agirliklar2[i][j] = agirliklar2[i][j] + (learning_rate * hata1[i] * birinciKatman[j]);
+            for (int c=0; c<10; c+=1) {
+                for (int d=0; d<128; d+=1) {
+                    agirliklar2[c][d] += (learningRate * hata1[c] * birinciKatman[d]);
                 }
-                bias2[i] = bias2[i] + learning_rate * hata1[i];
+                bias2[c] += learningRate * hata1[c];
             }
-            if (a % 1000 == 0) {
-            printf("Epoch: %d, Resim: %d tamamlandi.\n", ep+1, a);
+            if (b % 500 == 0) {
+            printf("Epoch: %d, Resim: %d tamamlandi.\n", a+1, b);
             }
         }
     }
 
     // İleri Yayılım Algoritması
     int dogruTahmin = 0;
-    for (int a = 0; a < 10000; a++) {
-    for (int c = 0; c < 128; c++) {
-        float toplam = 0;
-        for (int b = 0; b < 784; b++) {
-            toplam += resimlerTest[a][b] * agirliklar1[c][b];
+    for (int a = 0; a < 10000; a+=1) {
+        for (int b = 0; b < 128; b+=1) {
+            float toplam = 0;
+            for (int c = 0; c < 784; c+=1) {
+                toplam += resimlerTest[a][c] * agirliklar1[b][c];
+            }
+            birinciKatman[b] = relu(toplam + bias1[b]);
         }
-        birinciKatman[c] = sigmoid(toplam + bias1[c]);
-    }
-    for (int d = 0; d < 10; d++) {
-        float toplam = 0;
-        for (int e = 0; e < 128; e++) {
-            toplam += birinciKatman[e] * agirliklar2[d][e];
+        for (int b = 0; b < 10; b+=1) {
+            float toplam = 0;
+            for (int c = 0; c < 128; c+=1) {
+                toplam += birinciKatman[c] * agirliklar2[b][c];
+            }
+            ikinciKatman[b] = sigmoid(toplam + bias2[b]);
         }
-        ikinciKatman[d] = sigmoid(toplam + bias2[d]);
-    }
 
-    // En Yüksek Değeri Bulma
-    int tahmin = 0;
-    float maksimumDeger = ikinciKatman[0];
-    for (int i = 1; i < 10; i++) {
-        if (ikinciKatman[i] > maksimumDeger) {
-            maksimumDeger = ikinciKatman[i];
-            tahmin = i;
+        // En Yüksek Değeri Bulma
+        int tahmin = 0;
+        float maksimumDeger = ikinciKatman[0];
+        for (int b = 1; b < 10; b+=1) {
+            if (ikinciKatman[b] > maksimumDeger) {
+                maksimumDeger = ikinciKatman[b];
+                tahmin = b;
+            }
+        }
+        if (tahmin == etiketlerTest[a]) {
+            dogruTahmin+=1;
         }
     }
-    if (tahmin == etiketlerTest[a]) {
-        dogruTahmin++;
-    }
-    }
-    printf("Test Basarisi: %.2f\n", (float)dogruTahmin / 100.0);
+    printf("Test Basarisi: %%%.2f\n", (float)dogruTahmin / 100.0);
 }
