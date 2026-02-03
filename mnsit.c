@@ -35,10 +35,10 @@ int etiketlerTest[10000];
 int main () { 
 
     // Model Hiperparametreleri
-    #define epoch 20
-    #define learningRate 0.01
+    #define epoch 10
+    #define learningRate 0.1
     #define batchSize 64
-    #define hiddenLayer 128
+    #define hiddenLayer 256
 
     // Dosyaların Belirlenmesi
     FILE *goruntuDosyasi;
@@ -102,7 +102,7 @@ int main () {
     }
     for (int a=0; a<10; a=a+1) {
         for(int b=0; b<hiddenLayer; b=b+1) {
-            float std = sqrtf(2.0f / 784.0f);
+            float std = sqrtf(2.0f / (float)hiddenLayer);
             agirliklar2[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
         }
     }
@@ -123,6 +123,8 @@ int main () {
     // Öğrenme Algoritması
     for (int a=0; a<epoch; a+=1) {
         for (int b=0; b<60000; b+=1) {
+
+            // İleri Yayılım
             for (int c=0; c<hiddenLayer; c+=1) {
                 float toplam = 0;
                 for(int d=0; d<784; d+=1) {
@@ -140,11 +142,13 @@ int main () {
                 ikinciKatman[c] = sigmoid(toplam);
             }
 
+            // Hata Algoritması ve Hedef
             int hedef[10] = {0,0,0,0,0,0,0,0,0,0};
             hedef[etiketler[b]] = 1;
             float hata1[10];
             float hata2[hiddenLayer];
 
+            // Geri Yayılım Algoritması
             for (int c=0; c<10; c+=1) {
                 hata1[c] = hedef[c]-ikinciKatman[c];
                 hata1[c] = hata1[c]*sigmoidTurev(ikinciKatman[c]);
@@ -174,9 +178,9 @@ int main () {
         }
     }
 
-    // İleri Yayılım Algoritması
+    // Test Algoritması
     int dogruTahmin = 0;
-    for (int a=0; a>10000; a+=1) {
+    for (int a=0; a<10000; a+=1) {
         for (int b=0; b<hiddenLayer; b+=1) {
             float toplam = 0;
             for (int c=0; c<784; c+=1) {
@@ -201,9 +205,21 @@ int main () {
                 tahmin = b;
             }
         }
+
+        // SOn 10 Tahmin
+        if (a >= 9990) {
+        printf("Resim %d: Tahmin=%d, Gercek=%d, Cikislar=[", 
+               a, tahmin, etiketlerTest[a]);
+        for (int b=0; b<10; b+=1) {
+            printf("%.3f", ikinciKatman[b]);
+            if (b < 9) printf(", ");
+        }
+        printf("], Dogru=%s\n", 
+               (tahmin == etiketlerTest[a]) ? "EVET" : "HAYIR");
+        }
         if (tahmin == etiketlerTest[a]) {
             dogruTahmin+=1;
         }
     }
-    printf("Test Basarisi: %%%.2f\n", (float)dogruTahmin / 100.0);
+    printf("Test Basarisi: %%%.2f\n", (float)dogruTahmin / 10000.0 * 100.0);
 }
