@@ -206,10 +206,9 @@ int main () {
             }
         }
 
-        // SOn 10 Tahmin
+        // Son 10 Tahmin
         if (a >= 9990) {
-        printf("Resim %d: Tahmin=%d, Gercek=%d, Cikislar=[", 
-               a, tahmin, etiketlerTest[a]);
+        printf("Resim %d: Tahmin=%d, Gercek=%d, Cikislar=[", a, tahmin, etiketlerTest[a]);
         for (int b=0; b<10; b+=1) {
             printf("%.3f", ikinciKatman[b]);
             if (b < 9) printf(", ");
@@ -217,6 +216,8 @@ int main () {
         printf("], Dogru=%s\n", 
                (tahmin == etiketlerTest[a]) ? "EVET" : "HAYIR");
         }
+        
+        // Tahmin Sayacı
         if (tahmin == etiketlerTest[a]) {
             dogruTahmin+=1;
         }
