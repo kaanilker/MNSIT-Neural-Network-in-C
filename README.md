@@ -8,7 +8,7 @@ The project implements a simple yet complete neural network pipeline, including 
 
 ## Technical Specifications
 
-The model uses a classic Multi-Layer Perceptron (MLP) architecture:
+The model uses a classic Multi-Layer Perceptron (MLP) architecture (but everyone can change hidden layer neurons):
 
 - Input Layer  
   784 neurons corresponding to 28×28 grayscale images.
@@ -65,7 +65,8 @@ After compilation, run the program using:
 - Training set size: 60,000 images  
 - Test set size: 10,000 images  
 - Learning rate: 0.01  
-- Epochs: 20  
+- Epochs: 20
+- Hidden Layer Neuron Number: 128  
 
 With these hyperparameters, the model typically achieves an accuracy %97.88 on the test set. Results may vary slightly due to random weight initialization.
 
