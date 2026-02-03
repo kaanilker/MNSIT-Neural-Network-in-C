@@ -64,9 +64,9 @@ After compilation, run the program using:
 
 - Training set size: 60,000 images  
 - Test set size: 10,000 images  
-- Learning rate: 0.01  
-- Epochs: 20
-- Hidden Layer Neuron Number: 128  
+- Learning rate: 0.1 
+- Epochs: 10
+- Hidden Layer Neuron Number: 256
 
 With these hyperparameters, the model typically achieves an accuracy %97.88 on the test set. Results may vary slightly due to random weight initialization.
 
