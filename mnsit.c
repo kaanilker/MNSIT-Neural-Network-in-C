@@ -176,7 +176,8 @@ int main () {
             printf("Epoch: %d, Resim: %d tamamlandi.\n", a+1, b);
             }
         }
-        // Epochar İçin Test Algoritması
+        
+        // Epochlar İçin Test Algoritması
         int dogruTahmin = 0;
         for (int a=0; a<10000; a+=1) {
             for (int b=0; b<hiddenLayer; b+=1) {
@@ -230,7 +231,7 @@ int main () {
             ikinciKatman[b] = sigmoid(toplam + bias2[b]);
         }
 
-        // En Yüksek Değeri Bulma
+        // En Yüksek Olasılığı Bulma
         int tahmin = 0;
         float maksimumDeger = ikinciKatman[0];
         for (int b=1; b<10; b+=1) {
