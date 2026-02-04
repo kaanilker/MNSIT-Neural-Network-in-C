@@ -172,15 +172,49 @@ int main () {
                 }
                 bias2[c] += learningRate * hata1[c];
             }
-            if (b % 500 == 0) {
+            if (b % 10000 == 0) {
             printf("Epoch: %d, Resim: %d tamamlandi.\n", a+1, b);
             }
         }
+        // Epochar İçin Test Algoritması
+        int dogruTahmin = 0;
+        for (int a=0; a<10000; a+=1) {
+            for (int b=0; b<hiddenLayer; b+=1) {
+                float toplam = 0;
+                for (int c=0; c<784; c+=1) {
+                    toplam += resimlerTest[a][c] * agirliklar1[b][c];
+                }
+                birinciKatman[b] = relu(toplam + bias1[b]);
+            }
+            for (int b=0; b<10; b+=1) {
+                float toplam = 0;
+                for (int c=0; c<hiddenLayer; c+=1) {
+                    toplam += birinciKatman[c] * agirliklar2[b][c];
+                }
+                ikinciKatman[b] = sigmoid(toplam + bias2[b]);
+            }
+
+            // En Yüksek Olasılığı Bulma
+            int tahmin = 0;
+            float maksimumDeger = ikinciKatman[0];
+            for (int b=1; b<10; b+=1) {
+                if (ikinciKatman[b] > maksimumDeger) {
+                    maksimumDeger = ikinciKatman[b];
+                    tahmin = b;
+                }
+            }
+            if (tahmin == etiketlerTest[a]) {
+                dogruTahmin+=1;
+            }
+        }
+        printf("Epoch %d | Test Basarisi: %%%.2f\n",a+1, (float)dogruTahmin / 10000.0 * 100.0);
     }
 
-    // Test Algoritması
+    // Son 10 Tahmin Test Algoritması
+
+    // İleri Yayılım
     int dogruTahmin = 0;
-    for (int a=0; a<10000; a+=1) {
+    for (int a=9990; a<10000; a+=1) {
         for (int b=0; b<hiddenLayer; b+=1) {
             float toplam = 0;
             for (int c=0; c<784; c+=1) {
@@ -208,7 +242,7 @@ int main () {
 
         // Son 10 Tahmin
         if (a >= 9990) {
-        printf("Resim %d: Tahmin=%d, Gercek=%d, Cikislar=[", a, tahmin, etiketlerTest[a]);
+        printf("Resim %d: Tahmin=%d, Gercek=%d, Cikislar=[", a+1, tahmin, etiketlerTest[a]);
         for (int b=0; b<10; b+=1) {
             printf("%.3f", ikinciKatman[b]);
             if (b < 9) printf(", ");
@@ -216,11 +250,5 @@ int main () {
         printf("], Dogru=%s\n", 
                (tahmin == etiketlerTest[a]) ? "EVET" : "HAYIR");
         }
-        
-        // Tahmin Sayacı
-        if (tahmin == etiketlerTest[a]) {
-            dogruTahmin+=1;
-        }
     }
-    printf("Test Basarisi: %%%.2f\n", (float)dogruTahmin / 10000.0 * 100.0);
 }
