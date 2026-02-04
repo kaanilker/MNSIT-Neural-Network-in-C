@@ -78,9 +78,9 @@ These can be modified by changing the `#define` directives in the code:
 ## Training and Evaluation
 
 - The network trains for the specified number of epochs
-- Progress is printed every 500 training samples
-- After training completes, the model is evaluated on the 10,000 test images
-- The last 10 test predictions are displayed with detailed output probabilities
+- Progress is printed every 10,000 training samples
+- After each epoch completes, the model is evaluated on the 10,000 test images and accuracy is reported
+- After all training completes, the last 10 test predictions are displayed with detailed output probabilities
 - Final test accuracy is reported as a percentage
 
 ## Results and Performance
@@ -92,7 +92,8 @@ These can be modified by changing the `#define` directives in the code:
 - Epochs: 10
 - Learning Rate: 0.1
 - Hidden Layer Neurons: 256
-- **Test Accuracy: 97.88%**
+- **First Epoch Accuracy: 96.18%**
+- **Final Test Accuracy: 97.88%**
 
 This result was achieved with the default hyperparameters. Performance may vary slightly due to random weight initialization.
 
@@ -107,6 +108,7 @@ The project includes manual implementations of:
 - **Forward propagation** with matrix-vector operations
 - **Backpropagation** with proper gradient computation through ReLU and Sigmoid
 - **Gradient descent updates** for weights and biases
+- **Per-epoch evaluation** for monitoring training progress
 
 ## Code Structure
 
@@ -119,6 +121,7 @@ The implementation follows this flow:
    - Forward Propagation
    - Error Computation
    - Backpropagation with Weight Updates
+   - Per-Epoch Test Evaluation
 5. **Test Evaluation**
    - Forward Propagation on test set
    - Prediction via argmax
@@ -131,6 +134,7 @@ This project is intended for **educational purposes**. It prioritizes clarity an
 - Learning neural network internals without abstraction
 - Understanding backpropagation mathematics
 - Seeing how gradient descent works at the implementation level
+- Observing per-epoch training dynamics
 - Benchmarking against higher-level frameworks
 
 ## License
