@@ -123,7 +123,7 @@ int main () {
 
     // Öğrenme Algoritması
     for (int a=0; a<epoch; a+=1) {
-        if (a==1) learningRate = learningRate * gamma;
+        if (a==4) learningRate = learningRate * gamma;
         for (int b=0; b<60000; b+=1) {
 
             // İleri Yayılım
