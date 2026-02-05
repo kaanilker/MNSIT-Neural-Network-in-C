@@ -35,8 +35,9 @@ int etiketlerTest[10000];
 int main () { 
 
     // Model Hiperparametreleri
+    float learningRate = 0.1;
     #define epoch 10
-    #define learningRate 0.1
+    #define gamma 0.5
     #define batchSize 64
     #define hiddenLayer 256
 
@@ -122,6 +123,7 @@ int main () {
 
     // Öğrenme Algoritması
     for (int a=0; a<epoch; a+=1) {
+        if (a==1) learningRate = learningRate * gamma;
         for (int b=0; b<60000; b+=1) {
 
             // İleri Yayılım
@@ -172,7 +174,7 @@ int main () {
                 }
                 bias2[c] += learningRate * hata1[c];
             }
-            if (b % 10000 == 0) {
+            if (b % 10000 == 0 && b>0) {
             printf("Epoch: %d, Resim: %d tamamlandi.\n", a+1, b);
             }
         }
@@ -208,6 +210,7 @@ int main () {
                 dogruTahmin+=1;
             }
         }
+        printf("Epoch: %d, Resim: 60000 tamamlandi.\n", a+1);
         printf("Epoch %d | Test Basarisi: %%%.2f\n",a+1, (float)dogruTahmin / 10000.0 * 100.0);
     }
 
