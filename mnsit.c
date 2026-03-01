@@ -3,6 +3,30 @@
 #include <math.h>
 #include <omp.h>
 
+// Model Hiperparametreleri
+float learningRate = 0.1;
+#define epoch 10
+#define gamma 0.5
+#define batchSize 64
+#define hiddenLayer 256
+
+// Resimler ve Etiketlerin Matrisleri
+float resimler[60000][784];
+int etiketler[60000];
+float resimlerTest[10000][784];
+int etiketlerTest[10000];
+
+// Ağırlık ve Bias Matrislerinin OLuşturulması
+float agirliklar1[hiddenLayer][784];
+float agirliklar2[10][hiddenLayer];
+float bias1[hiddenLayer];
+float bias2[10];
+
+// Yapay Nöronların Oluşturulması
+/* float girdi[784]; Bu dizi ileride resim okuma eklendiğinde çalışacaktır. */
+float birinciKatman[hiddenLayer];
+float ikinciKatman[10];
+
 // Sigmoid ve ReLU Aktivasyon Fonksiyonu ve Türevi
 float sigmoid(float x) {
 return 1.0f / (1.0f + expf(-x));
@@ -26,107 +50,14 @@ float reluTurev(float x) {
     }
 }
 
-// Resimler ve Etiketlerin Matrisleri
-float resimler[60000][784];
-int etiketler[60000];
-float resimlerTest[10000][784];
-int etiketlerTest[10000];
-
-int main () { 
-
-    // Model Hiperparametreleri
-    float learningRate = 0.1;
-    #define epoch 10
-    #define gamma 0.5
-    #define batchSize 64
-    #define hiddenLayer 256
-
-    // Dosyaların Belirlenmesi
-    FILE *goruntuDosyasi;
-    FILE *etiketDosyasi;
-    FILE *goruntuTestDosyasi;
-    FILE *etiketTestDosyasi;
-    goruntuDosyasi = fopen("train-images.idx3-ubyte", "rb");
-    etiketDosyasi = fopen("train-labels.idx1-ubyte", "rb");
-    goruntuTestDosyasi = fopen("t10k-images.idx3-ubyte", "rb");
-    etiketTestDosyasi = fopen("t10k-labels.idx1-ubyte", "rb");
-    
-    // Sahte Okuma
-    unsigned char sahteOkuma[16];
-    fread(sahteOkuma, 1,16, goruntuDosyasi);
-    fread(sahteOkuma, 1, 8, etiketDosyasi);
-    fread(sahteOkuma, 1,16, goruntuTestDosyasi);
-    fread(sahteOkuma, 1, 8, etiketTestDosyasi);
-    
-    // Dosyaların Okunup Değişken İçine Atanması
-    for(int a=0; a<60000; a=a+1) {
-        unsigned char geciciDizi[784];
-        fread(geciciDizi,1,784,goruntuDosyasi);
-
-        for (int b=0; b<784; b=b+1) {
-        resimler[a][b] = (float)geciciDizi[b]/255.0;
-        } 
-    }
-    for(int a=0; a<60000; a=a+1) {
-        unsigned char geciciDizi;
-        fread(&geciciDizi,1,1,etiketDosyasi);
-
-        etiketler[a] = (int)geciciDizi;
-    }
-    for(int a=0; a<10000; a=a+1) {
-        unsigned char geciciDizi[784];
-        fread(geciciDizi,1,784,goruntuTestDosyasi);
-
-        for (int b=0; b<784; b=b+1) {
-        resimlerTest[a][b] = (float)geciciDizi[b]/255.0;
-        } 
-    }
-    for(int a=0; a<10000; a=a+1) {
-        unsigned char geciciDizi;
-        fread(&geciciDizi,1,1,etiketTestDosyasi);
-
-        etiketlerTest[a] = (int)geciciDizi;
-    }
-
-    // Ağırlık ve Bias Matrislerinin OLuşturulması
-    float agirliklar1[hiddenLayer][784];
-    float agirliklar2[10][hiddenLayer];
-    float bias1[hiddenLayer];
-    float bias2[10];
-
-    // Ağırlık Matrislerinin Doldurulması
-    for (int a=0; a<hiddenLayer; a=a+1) {
-        for(int b=0; b<784; b=b+1) {
-            float std = sqrtf(2.0f / 784.0f);
-            agirliklar1[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
-        }
-    }
-    for (int a=0; a<10; a=a+1) {
-        for(int b=0; b<hiddenLayer; b=b+1) {
-            float std = sqrtf(2.0f / (float)hiddenLayer);
-            agirliklar2[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
-        }
-    }
-
-    // Bias Matrislerinin Doldurulması
-    for (int a=0; a<hiddenLayer; a=a+1) {
-            bias1[a] = ((float)rand() / RAND_MAX - 0.5) * 0.01;
-    }
-    for (int a=0; a<10; a=a+1) {
-            bias2[a] = ((float)rand() / RAND_MAX - 0.5) * 0.01;
-    }
-
-    // Yapay Nöronların Oluşturulması
-    /* float girdi[784]; Bu dizi ileride resim okuma eklendiğinde çalışacaktır. */
-    float birinciKatman[hiddenLayer];
-    float ikinciKatman[10];
-
-    // Öğrenme Algoritması
+// Kullanılacak Fonksiyonlar
+void egitimAlgoritmasi () {
     for (int a=0; a<epoch; a+=1) {
         if (a==5) learningRate = learningRate * gamma;
         for (int b=0; b<60000; b+=1) {
 
             // İleri Yayılım
+            #pragma omp parallel for schedule(static)
             for (int c=0; c<hiddenLayer; c+=1) {
                 float toplam = 0;
                 for(int d=0; d<784; d+=1) {
@@ -151,6 +82,7 @@ int main () {
             float hata2[hiddenLayer];
 
             // Geri Yayılım Algoritması
+            #pragma omp parallel for schedule(static)
             for (int c=0; c<10; c+=1) {
                 hata1[c] = hedef[c]-ikinciKatman[c];
                 hata1[c] = hata1[c]*sigmoidTurev(ikinciKatman[c]);
@@ -213,9 +145,9 @@ int main () {
         printf("Epoch: %d, Resim: 60000 tamamlandi.\n", a+1);
         printf("Epoch %d | Test Basarisi: %%%.2f\n",a+1, (float)dogruTahmin / 10000.0 * 100.0);
     }
+}
 
-    // Son 10 Tahmin Test Algoritması
-
+void testAlgoritmasi () {
     // İleri Yayılım
     int dogruTahmin = 0;
     for (int a=9990; a<10000; a+=1) {
@@ -255,4 +187,82 @@ int main () {
                (tahmin == etiketlerTest[a]) ? "EVET" : "HAYIR");
         }
     }
+}
+
+int main () { 
+
+    // Dosyaların Belirlenmesi
+    FILE *goruntuDosyasi;
+    FILE *etiketDosyasi;
+    FILE *goruntuTestDosyasi;
+    FILE *etiketTestDosyasi;
+    goruntuDosyasi = fopen("train-images.idx3-ubyte", "rb");
+    etiketDosyasi = fopen("train-labels.idx1-ubyte", "rb");
+    goruntuTestDosyasi = fopen("t10k-images.idx3-ubyte", "rb");
+    etiketTestDosyasi = fopen("t10k-labels.idx1-ubyte", "rb");
+    
+    // Sahte Okuma
+    unsigned char sahteOkuma[16];
+    fread(sahteOkuma, 1,16, goruntuDosyasi);
+    fread(sahteOkuma, 1, 8, etiketDosyasi);
+    fread(sahteOkuma, 1,16, goruntuTestDosyasi);
+    fread(sahteOkuma, 1, 8, etiketTestDosyasi);
+    
+    // Dosyaların Okunup Değişken İçine Atanması
+    for(int a=0; a<60000; a=a+1) {
+        unsigned char geciciDizi[784];
+        fread(geciciDizi,1,784,goruntuDosyasi);
+
+        for (int b=0; b<784; b=b+1) {
+        resimler[a][b] = (float)geciciDizi[b]/255.0;
+        } 
+    }
+    for(int a=0; a<60000; a=a+1) {
+        unsigned char geciciDizi;
+        fread(&geciciDizi,1,1,etiketDosyasi);
+
+        etiketler[a] = (int)geciciDizi;
+    }
+    for(int a=0; a<10000; a=a+1) {
+        unsigned char geciciDizi[784];
+        fread(geciciDizi,1,784,goruntuTestDosyasi);
+
+        for (int b=0; b<784; b=b+1) {
+        resimlerTest[a][b] = (float)geciciDizi[b]/255.0;
+        } 
+    }
+    for(int a=0; a<10000; a=a+1) {
+        unsigned char geciciDizi;
+        fread(&geciciDizi,1,1,etiketTestDosyasi);
+
+        etiketlerTest[a] = (int)geciciDizi;
+    }
+
+    // Ağırlık Matrislerinin Doldurulması
+    for (int a=0; a<hiddenLayer; a=a+1) {
+        for(int b=0; b<784; b=b+1) {
+            float std = sqrtf(2.0f / 784.0f);
+            agirliklar1[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
+        }
+    }
+    for (int a=0; a<10; a=a+1) {
+        for(int b=0; b<hiddenLayer; b=b+1) {
+            float std = sqrtf(2.0f / (float)hiddenLayer);
+            agirliklar2[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
+        }
+    }
+
+    // Bias Matrislerinin Doldurulması
+    for (int a=0; a<hiddenLayer; a=a+1) {
+            bias1[a] = ((float)rand() / RAND_MAX - 0.5) * 0.01;
+    }
+    for (int a=0; a<10; a=a+1) {
+            bias2[a] = ((float)rand() / RAND_MAX - 0.5) * 0.01;
+    }
+
+    // Öğrenme Algoritması
+    egitimAlgoritmasi();
+
+    // Son 10 Tahmin Test Algoritması
+    testAlgoritmasi ();
 }
