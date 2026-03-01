@@ -27,7 +27,7 @@ The following MNIST dataset files must be present in the project directory:
 - `t10k-images.idx3-ubyte` — Test images (10,000 samples)
 - `t10k-labels.idx1-ubyte` — Test labels  
 
-These files can be downloaded from the official MNIST dataset source at http://yann.lecun.com/exdb/mnist/
+These files can be downloaded from the official MNIST dataset source at https://www.kaggle.com/datasets/hojjatk/mnist-datasethttp://yann.lecun.com/exdb/mnist/
 
 ## Installation and Compilation
 
