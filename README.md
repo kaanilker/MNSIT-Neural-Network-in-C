@@ -45,7 +45,6 @@ Since mathematical functions are used, the math library must be linked explicitl
 ```bash
 gcc mnsit.c -o mnsit -lm -fopenmp -O3 -ffast-math -march=native
 ```
-``
 
 ## Execution
 
@@ -132,9 +131,9 @@ The implementation is organized into the following functions:
 ### `egitimAlgoritmasi()`
 Handles the full training loop across all epochs:
 - Learning rate decay check at epoch 5
-- Forward propagation through hidden (ReLU) and output (Sigmoid) layers — hidden layer loop parallelized with `#pragma omp parallel for`
+- Forward propagation through hidden (ReLU) and output (Sigmoid) layers — hidden layer loop parallelized with `#pragma omp parallel for schedule(static)`
 - Error computation using one-hot encoded targets
-- Backpropagation with gradient calculation — output error loop parallelized with `#pragma omp parallel for`
+- Backpropagation with gradient calculation — output error loop parallelized with `#pragma omp parallel for schedule(static)`
 - Weight and bias updates using computed gradients
 - Progress logging every 10,000 samples
 - Per-epoch evaluation on the full test set with accuracy reporting
