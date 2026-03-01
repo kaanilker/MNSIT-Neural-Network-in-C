@@ -4,7 +4,7 @@ This repository contains a standalone implementation of a feed-forward neural ne
 
 ## Overview
 
-The project implements a complete neural network pipeline, including data loading, forward propagation, backpropagation, and evaluation. Every step is implemented manually to provide full transparency into how neural networks operate at a low level.
+The project implements a complete neural network pipeline, including data loading, forward propagation, backpropagation, and evaluation. Every step is implemented manually to provide full transparency into how neural networks operate at a low level. The codebase has been refactored into a modular structure with separate functions for training and testing, and global variables for shared state across functions.
 
 ## Technical Specifications
 
@@ -16,6 +16,7 @@ The model uses a Multi-Layer Perceptron (MLP) architecture with configurable hid
 - **Training Algorithm:** Stochastic Gradient Descent (SGD) with Backpropagation
 - **Weight Initialization:** He initialization for ReLU layers, Xavier-like initialization for Sigmoid output layer
 - **Learning Rate Scheduling:** Dynamic learning rate decay with gamma-based reduction
+- **Parallelism:** OpenMP directives applied to independent forward and backward propagation loops
 
 ## Dataset Requirements
 
@@ -35,21 +36,16 @@ The implementation depends only on standard C libraries:
 - `stdio.h`
 - `stdlib.h`
 - `math.h`
-- `omp.h` (for potential parallel processing support)
+- `omp.h` (for parallel processing support via OpenMP)
 
 Since mathematical functions are used, the math library must be linked explicitly.
 
 **Compile (Linux / Unix):**
 
 ```bash
-gcc mnsit.c -o mnsit -lm -fopenmp
+gcc mnsit.c -o mnsit -lm -fopenmp -O3 -ffast-math -march=native
 ```
-
-**Compile (without OpenMP):**
-
-```bash
-gcc mnsit.c -o mnsit -lm
-```
+``
 
 ## Execution
 
@@ -61,7 +57,7 @@ After compilation, run the program using:
 
 ## Hyperparameters
 
-The model uses the following hyperparameters (configurable at compile time):
+The model uses the following hyperparameters defined at global scope (configurable at compile time):
 
 - **Epochs:** 10
 - **Initial Learning Rate:** 0.1
@@ -69,7 +65,7 @@ The model uses the following hyperparameters (configurable at compile time):
 - **Batch Size:** 64 (defined but not currently used; updates occur per sample)
 - **Hidden Layer Neurons:** 256
 
-These can be modified by changing the `#define` directives in the code:
+These can be modified by changing the `#define` directives and the global variable declaration in the code:
 
 ```c
 float learningRate = 0.1;
@@ -88,10 +84,10 @@ The current implementation includes a basic learning rate decay mechanism:
 
 ## Training and Evaluation
 
-- The network trains for the specified number of epochs
+- The network trains for the specified number of epochs via `egitimAlgoritmasi()`
 - Progress is printed every 10,000 training samples during each epoch
 - After each epoch completes, the model is evaluated on the entire test set (10,000 images) and accuracy is reported
-- After all training completes, the last 10 test predictions (images 9990-9999) are displayed with:
+- After all training completes, `testAlgoritmasi()` displays the last 10 test predictions (images 9990–9999) with:
   - Image index
   - Predicted class
   - True label
@@ -110,7 +106,7 @@ The current implementation includes a basic learning rate decay mechanism:
 - Hidden Layer Neurons: 256
 - Activation Functions: ReLU (hidden), Sigmoid (output)
 
-Expected performance with these settings typically achieves 97-98% test accuracy. Performance may vary slightly due to random weight initialization.
+Expected performance with these settings typically achieves %98.11 test accuracy. Performance may vary slightly due to random weight initialization.
 
 ## Implementation Details
 
@@ -120,8 +116,8 @@ The project includes manual implementations of:
 - **Input normalization** (pixel values scaled from 0–255 to 0.0–1.0)
 - **He initialization** for weights (ReLU-optimized)
 - **Activation functions:** ReLU (hidden layer) and Sigmoid (output layer) with their derivatives
-- **Forward propagation** with matrix-vector operations
-- **Backpropagation** with proper gradient computation through ReLU and Sigmoid
+- **Forward propagation** with matrix-vector operations, parallelized via OpenMP
+- **Backpropagation** with proper gradient computation through ReLU and Sigmoid, with OpenMP on independent loops
 - **Gradient descent updates** for weights and biases
 - **Learning rate scheduling** with gamma-based decay
 - **Per-epoch evaluation** for monitoring training progress
@@ -129,25 +125,34 @@ The project includes manual implementations of:
 
 ## Code Structure
 
-The implementation follows this flow:
+All weights, biases, neuron arrays, and hyperparameters are declared as **global variables**, allowing them to be shared seamlessly between the modular functions without passing large arrays as arguments.
 
-1. **Activation Functions** - Sigmoid, ReLU, and their derivatives (`sigmoidTurev`, `reluTurev`)
-2. **Data Loading** - MNIST binary file parsing with header skipping and normalization
-3. **Weight Initialization** - He initialization for optimal convergence with ReLU activation
-4. **Training Loop**
-   - Learning rate decay check (currently at epoch 5)
-   - Forward Propagation through hidden and output layers
-   - Error Computation using one-hot encoded targets
-   - Backpropagation with gradient calculation
-   - Weight and bias updates using calculated gradients
-   - Progress logging every 10,000 samples
-5. **Per-Epoch Test Evaluation**
-   - Forward propagation on entire test set
-   - Prediction via argmax (finding maximum output probability)
-   - Accuracy calculation and reporting
-6. **Final Detailed Test Output**
-   - Last 10 predictions with full probability distributions
-   - Comparison with ground truth labels
+The implementation is organized into the following functions:
+
+### `egitimAlgoritmasi()`
+Handles the full training loop across all epochs:
+- Learning rate decay check at epoch 5
+- Forward propagation through hidden (ReLU) and output (Sigmoid) layers — hidden layer loop parallelized with `#pragma omp parallel for`
+- Error computation using one-hot encoded targets
+- Backpropagation with gradient calculation — output error loop parallelized with `#pragma omp parallel for`
+- Weight and bias updates using computed gradients
+- Progress logging every 10,000 samples
+- Per-epoch evaluation on the full test set with accuracy reporting
+
+### `testAlgoritmasi()`
+Runs inference on the last 10 test images (9990–9999) and prints:
+- Predicted class and ground truth label
+- Full output probability vector
+- Correctness indicator (EVET/HAYIR)
+
+### `main()`
+Entry point responsible for:
+1. Opening and reading the four MNIST binary files
+2. Skipping file headers via dummy reads
+3. Loading and normalizing image data
+4. Initializing weights (He initialization) and biases
+5. Calling `egitimAlgoritmasi()`
+6. Calling `testAlgoritmasi()`
 
 ## Evaluation Metrics
 
@@ -187,7 +192,7 @@ While the current implementation is functional and educational, possible enhance
 - Adding validation set for early stopping
 - Implementing cross-entropy loss calculation for monitoring
 - Adding data augmentation for improved generalization
-- Parallelizing matrix operations with OpenMP
+- Expanding OpenMP parallelism to weight update loops for further speedup
 - Adding confusion matrix for detailed error analysis
 
 ## License
