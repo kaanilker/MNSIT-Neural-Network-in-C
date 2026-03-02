@@ -15,8 +15,9 @@ The model uses a Multi-Layer Perceptron (MLP) architecture with configurable hid
 - **Output Layer:** 10 neurons representing digits 0–9, using Sigmoid activation to produce probability-like confidence values
 - **Training Algorithm:** Stochastic Gradient Descent (SGD) with Backpropagation
 - **Weight Initialization:** He initialization for ReLU layers, Xavier-like initialization for Sigmoid output layer
-- **Learning Rate Scheduling:** Dynamic learning rate decay with gamma-based reduction
-- **Parallelism:** OpenMP directives applied to independent forward and backward propagation loops
+- **Learning Rate Scheduling:** Adaptive learning rate decay based on per-epoch test accuracy improvement
+- **Weight Checkpointing:** Best-performing weights are backed up each epoch and restored if accuracy regresses
+- **Parallelism:** OpenMP directives applied to forward propagation, backward propagation, and weight update loops
 
 ## Dataset Requirements
 
@@ -58,35 +59,42 @@ After compilation, run the program using:
 
 The model uses the following hyperparameters defined at global scope (configurable at compile time):
 
-- **Epochs:** 10
-- **Initial Learning Rate:** 0.1
-- **Learning Rate Decay (Gamma):** 0.5
-- **Batch Size:** 64 (defined but not currently used; updates occur per sample)
+- **Epochs:** 25
+- **Initial Learning Rate:** 0.07
+- **Learning Rate Decay (Gamma):** 0.9
 - **Hidden Layer Neurons:** 256
 
 These can be modified by changing the `#define` directives and the global variable declaration in the code:
 
 ```c
-float learningRate = 0.1;
-#define epoch 10
-#define gamma 0.5
-#define batchSize 64
+float learningRate = 0.07;
+#define epoch 25
+#define gamma 0.9
 #define hiddenLayer 256
 ```
 
-### Learning Rate Scheduling
+### Adaptive Learning Rate Scheduling
 
-The current implementation includes a basic learning rate decay mechanism:
-- The learning rate is reduced by multiplying with `gamma` (0.5) at epoch 5
-- This means the learning rate changes from 0.1 to 0.05 after the fifth epoch
-- For more advanced scheduling (e.g., step decay every N epochs), the code can be modified to use modulo operations
+The current implementation uses a dynamic, accuracy-driven learning rate decay mechanism:
+
+- **Epochs 1–10:** If test accuracy improves by fewer than 5 correct predictions compared to the previous epoch, the learning rate is multiplied by `gamma` (0.9)
+- **Epochs 11+:** The threshold tightens — if accuracy improves by fewer than 2 correct predictions, the learning rate is multiplied by `gamma`
+- This adaptive approach ensures the learning rate decays only when the model plateaus, allowing larger steps during rapid improvement phases and finer adjustments as training converges
+
+### Weight Checkpointing
+
+To prevent accuracy regression from bad updates:
+
+- After each epoch where accuracy improves, the current weights and biases are saved into backup arrays (`agirliklar1Yedek`, `agirliklar2Yedek`, `bias1Yedek`, `bias2Yedek`)
+- If accuracy drops in any epoch, the weights are automatically restored from the last known best checkpoint before continuing
 
 ## Training and Evaluation
 
 - The network trains for the specified number of epochs via `egitimAlgoritmasi()`
+- The current learning rate is printed at the start of each epoch
 - Progress is printed every 10,000 training samples during each epoch
 - After each epoch completes, the model is evaluated on the entire test set (10,000 images) and accuracy is reported
-- After all training completes, `testAlgoritmasi()` displays the last 10 test predictions (images 9990–9999) with:
+- After all training completes, `sonTestAlgoritmasi()` displays the last 10 test predictions (images 9990–9999) with:
   - Image index
   - Predicted class
   - True label
@@ -99,13 +107,13 @@ The current implementation includes a basic learning rate decay mechanism:
 
 - Training set: 60,000 images  
 - Test set: 10,000 images
-- Epochs: 10
-- Initial Learning Rate: 0.1
-- Learning Rate Decay: 0.5 at epoch 5
+- Epochs: 25
+- Initial Learning Rate: 0.07
+- Learning Rate Decay (Gamma): 0.9 (adaptive, accuracy-driven)
 - Hidden Layer Neurons: 256
 - Activation Functions: ReLU (hidden), Sigmoid (output)
 
-Expected performance with these settings typically achieves %98.11 test accuracy. Performance may vary slightly due to random weight initialization.
+Achieved test accuracy with these settings: **%98.47**. Performance may vary slightly due to random weight initialization.
 
 ## Implementation Details
 
@@ -116,29 +124,32 @@ The project includes manual implementations of:
 - **He initialization** for weights (ReLU-optimized)
 - **Activation functions:** ReLU (hidden layer) and Sigmoid (output layer) with their derivatives
 - **Forward propagation** with matrix-vector operations, parallelized via OpenMP
-- **Backpropagation** with proper gradient computation through ReLU and Sigmoid, with OpenMP on independent loops
-- **Gradient descent updates** for weights and biases
-- **Learning rate scheduling** with gamma-based decay
+- **Backpropagation** with proper gradient computation through ReLU and Sigmoid, parallelized via OpenMP
+- **Weight update loops** parallelized via OpenMP for additional throughput
+- **Adaptive learning rate scheduling** driven by per-epoch accuracy delta
+- **Weight checkpointing and rollback** to preserve the best model state
 - **Per-epoch evaluation** for monitoring training progress
 - **Detailed prediction output** for the last 10 test samples
 
 ## Code Structure
 
-All weights, biases, neuron arrays, and hyperparameters are declared as **global variables**, allowing them to be shared seamlessly between the modular functions without passing large arrays as arguments.
+All weights, biases, neuron arrays, backup arrays, and hyperparameters are declared as **global variables**, allowing them to be shared seamlessly between the modular functions without passing large arrays as arguments.
 
 The implementation is organized into the following functions:
 
 ### `egitimAlgoritmasi()`
 Handles the full training loop across all epochs:
-- Learning rate decay check at epoch 5
-- Forward propagation through hidden (ReLU) and output (Sigmoid) layers — hidden layer loop parallelized with `#pragma omp parallel for schedule(static)`
+- Adaptive learning rate decay based on accuracy improvement thresholds (epochs 1–10 vs. 11+)
+- Weight rollback to backup if accuracy regresses
+- Forward propagation through hidden (ReLU) and output (Sigmoid) layers — all major loops parallelized with `#pragma omp parallel for schedule(static)`
 - Error computation using one-hot encoded targets
-- Backpropagation with gradient calculation — output error loop parallelized with `#pragma omp parallel for schedule(static)`
-- Weight and bias updates using computed gradients
-- Progress logging every 10,000 samples
+- Backpropagation with gradient calculation — all independent loops parallelized with `#pragma omp parallel for schedule(static)`
+- Weight and bias updates using computed gradients — update loops also parallelized
+- Progress logging every 10,000 samples and current learning rate printed at each epoch start
 - Per-epoch evaluation on the full test set with accuracy reporting
+- Weight checkpointing when accuracy improves
 
-### `testAlgoritmasi()`
+### `sonTestAlgoritmasi()`
 Runs inference on the last 10 test images (9990–9999) and prints:
 - Predicted class and ground truth label
 - Full output probability vector
@@ -149,9 +160,9 @@ Entry point responsible for:
 1. Opening and reading the four MNIST binary files
 2. Skipping file headers via dummy reads
 3. Loading and normalizing image data
-4. Initializing weights (He initialization) and biases
+4. Initializing weights (He initialization) and biases — weight initialization loops parallelized with OpenMP
 5. Calling `egitimAlgoritmasi()`
-6. Calling `testAlgoritmasi()`
+6. Calling `sonTestAlgoritmasi()`
 
 ## Evaluation Metrics
 
@@ -175,9 +186,10 @@ This project is intended for **educational purposes**. It prioritizes clarity an
 
 - Learning neural network internals without abstraction
 - Understanding backpropagation mathematics and gradient descent
-- Seeing how learning rate scheduling affects convergence
+- Seeing how adaptive learning rate scheduling affects convergence
 - Observing per-epoch training dynamics and model improvement
 - Understanding activation functions and their derivatives
+- Studying the impact of weight checkpointing and rollback strategies
 - Benchmarking against higher-level frameworks
 - Studying the impact of hyperparameter choices
 
@@ -185,14 +197,13 @@ This project is intended for **educational purposes**. It prioritizes clarity an
 
 While the current implementation is functional and educational, possible enhancements include:
 
-- Implementing periodic step-based learning rate decay (e.g., every N epochs)
-- Adding mini-batch gradient descent instead of per-sample updates
+- Implementing mini-batch gradient descent instead of per-sample updates
 - Implementing adaptive learning rate methods (e.g., Adam, RMSprop)
 - Adding validation set for early stopping
 - Implementing cross-entropy loss calculation for monitoring
 - Adding data augmentation for improved generalization
-- Expanding OpenMP parallelism to weight update loops for further speedup
 - Adding confusion matrix for detailed error analysis
+- Saving and loading trained weights to/from disk
 
 ## License
 
