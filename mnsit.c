@@ -4,11 +4,11 @@
 #include <omp.h>
 
 // Model Hiperparametreleri
-float learningRate = 0.1;
-#define epoch 10
-#define gamma 0.5
-#define batchSize 64
+float learningRate = 0.07;
+#define epoch 25
+#define gamma 0.9
 #define hiddenLayer 256
+// #define batchSize 64
 
 // Resimler ve Etiketlerin Matrisleri
 float resimler[60000][784];
@@ -22,6 +22,12 @@ float agirliklar2[10][hiddenLayer];
 float bias1[hiddenLayer];
 float bias2[10];
 
+// Yedek Ağırlık ve Bias Matrislerinin Oluşturulması
+float agirliklar1Yedek[hiddenLayer][784];
+float agirliklar2Yedek[10][hiddenLayer];
+float bias1Yedek[hiddenLayer];
+float bias2Yedek[10];
+
 // Yapay Nöronların Oluşturulması
 /* float girdi[784]; Bu dizi ileride resim okuma eklendiğinde çalışacaktır. */
 float birinciKatman[hiddenLayer];
@@ -34,7 +40,6 @@ return 1.0f / (1.0f + expf(-x));
 float sigmoidTurev(float x) {
 return x*(1-x);
 }
-
 float relu(float x) {
     if (x<=0) {
         return 0;
@@ -50,10 +55,41 @@ float reluTurev(float x) {
     }
 }
 
+// Öğrenme Değişkenliği
+int guncelTahmin = 0;
+int eskiTahmin = 0;
+
 // Kullanılacak Fonksiyonlar
 void egitimAlgoritmasi () {
     for (int a=0; a<epoch; a+=1) {
-        if (a==5) learningRate = learningRate * gamma;
+
+        // Kaydetme ve Öğrenme Oranı Belirleme
+        if (a != 0 && a<10 && guncelTahmin < (eskiTahmin+5)) {
+            learningRate = learningRate * gamma;
+        }
+        else if (a != 0 && a>10 && guncelTahmin < (eskiTahmin+2)) {
+            learningRate = learningRate * gamma;
+        }
+
+        if (a != 0 && guncelTahmin < eskiTahmin) {
+            for (int b=0; b<hiddenLayer; b+=1) {
+                    for (int c=0; c<784; c+=1) {
+                        agirliklar1[b][c] = agirliklar1Yedek[b][c];
+                    }
+                }
+                for (int b=0; b<10; b+=1) {
+                    for (int c=0; c<hiddenLayer; c+=1) {
+                        agirliklar2[b][c] = agirliklar2Yedek[b][c];
+                    }
+                }
+                for (int b=0; b<hiddenLayer; b+=1) {
+                    bias1[b] = bias1Yedek[b];
+                }
+                for (int b=0; b<10; b+=1) {
+                    bias2[b] = bias2Yedek[b];
+            }
+        }  
+        printf("lr : %f \n", learningRate);
         for (int b=0; b<60000; b+=1) {
 
             // İleri Yayılım
@@ -65,7 +101,8 @@ void egitimAlgoritmasi () {
                     }
                 toplam += bias1[c];
                 birinciKatman[c] = relu(toplam);
-            }  
+            }
+            #pragma omp parallel for schedule(static)
             for (int c=0; c<10; c+=1) {
                 float toplam = 0;
                 for(int d=0; d<hiddenLayer; d+=1) {
@@ -87,6 +124,7 @@ void egitimAlgoritmasi () {
                 hata1[c] = hedef[c]-ikinciKatman[c];
                 hata1[c] = hata1[c]*sigmoidTurev(ikinciKatman[c]);
             }
+            #pragma omp parallel for schedule(static)
             for (int c=0; c<hiddenLayer; c+=1) { 
                 float toplam = 0;
                 for (int d=0; d<10; d+=1) {
@@ -94,12 +132,14 @@ void egitimAlgoritmasi () {
                 }
                 hata2[c] = toplam * reluTurev(birinciKatman[c]);
             }
+            #pragma omp parallel for schedule(static)
             for (int c=0; c<hiddenLayer; c+=1) {
                 for (int d=0; d<784; d+=1) {
                     agirliklar1[c][d] += (learningRate *hata2[c] * resimler[b][d]);
                 }
                 bias1[c] += learningRate * hata2[c];
             }
+            #pragma omp parallel for schedule(static)
             for (int c=0; c<10; c+=1) {
                 for (int d=0; d<hiddenLayer; d+=1) {
                     agirliklar2[c][d] += (learningRate * hata1[c] * birinciKatman[d]);
@@ -110,10 +150,31 @@ void egitimAlgoritmasi () {
             printf("Epoch: %d, Resim: %d tamamlandi.\n", a+1, b);
             }
         }
+
+        // Yedekleme
+            if (a != 0 && guncelTahmin > eskiTahmin) {
+                for (int b=0; b<hiddenLayer; b+=1) {
+                    for (int c=0; c<784; c+=1) {
+                        agirliklar1Yedek[b][c] = agirliklar1[b][c];
+                    }
+                }
+                for (int b=0; b<10; b+=1) {
+                    for (int c=0; c<hiddenLayer; c+=1) {
+                        agirliklar2Yedek[b][c] = agirliklar2[b][c];
+                    }
+                }
+                for (int b=0; b<hiddenLayer; b+=1) {
+                        bias1Yedek[b] = bias1[b];
+                }
+                for (int b=0; b<10; b+=1) {
+                        bias2Yedek[b] = bias2[b];
+                }
+            }
         
         // Epochlar İçin Test Algoritması
         int dogruTahmin = 0;
         for (int a=0; a<10000; a+=1) {
+            #pragma omp parallel for schedule(static)
             for (int b=0; b<hiddenLayer; b+=1) {
                 float toplam = 0;
                 for (int c=0; c<784; c+=1) {
@@ -121,6 +182,7 @@ void egitimAlgoritmasi () {
                 }
                 birinciKatman[b] = relu(toplam + bias1[b]);
             }
+            #pragma omp parallel for schedule(static)
             for (int b=0; b<10; b+=1) {
                 float toplam = 0;
                 for (int c=0; c<hiddenLayer; c+=1) {
@@ -142,12 +204,19 @@ void egitimAlgoritmasi () {
                 dogruTahmin+=1;
             }
         }
+        eskiTahmin = guncelTahmin;
+        guncelTahmin = dogruTahmin;
         printf("Epoch: %d, Resim: 60000 tamamlandi.\n", a+1);
-        printf("Epoch %d | Test Basarisi: %%%.2f\n",a+1, (float)dogruTahmin / 10000.0 * 100.0);
+        if (a != 9) {
+            printf("Epoch %d | Test Basarisi: %%%.2f\n",a+1, (float)dogruTahmin / 10000.0 * 100.0);
+        }
+        else {
+            printf("Model Basari Orani: %%%.2f\n", (float)dogruTahmin / 10000.0 * 100.0);
+        }
     }
 }
 
-void testAlgoritmasi () {
+void sonTestAlgoritmasi () {
     // İleri Yayılım
     int dogruTahmin = 0;
     for (int a=9990; a<10000; a+=1) {
@@ -239,13 +308,17 @@ int main () {
     }
 
     // Ağırlık Matrislerinin Doldurulması
+    #pragma omp parallel for schedule(static)
     for (int a=0; a<hiddenLayer; a=a+1) {
+        #pragma omp parallel for schedule(static)
         for(int b=0; b<784; b=b+1) {
             float std = sqrtf(2.0f / 784.0f);
             agirliklar1[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
         }
     }
+    #pragma omp parallel for schedule(static)
     for (int a=0; a<10; a=a+1) {
+        #pragma omp parallel for schedule(static)
         for(int b=0; b<hiddenLayer; b=b+1) {
             float std = sqrtf(2.0f / (float)hiddenLayer);
             agirliklar2[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
@@ -264,5 +337,5 @@ int main () {
     egitimAlgoritmasi();
 
     // Son 10 Tahmin Test Algoritması
-    testAlgoritmasi ();
+    sonTestAlgoritmasi ();
 }
