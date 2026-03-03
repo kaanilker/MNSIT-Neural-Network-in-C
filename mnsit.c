@@ -207,7 +207,7 @@ void egitimAlgoritmasi () {
         eskiTahmin = guncelTahmin;
         guncelTahmin = dogruTahmin;
         printf("Epoch: %d, Resim: 60000 tamamlandi.\n", a+1);
-        if (a != 9) {
+        if (a != epoch - 1) {
             printf("Epoch %d | Test Basarisi: %%%.2f\n",a+1, (float)dogruTahmin / 10000.0 * 100.0);
         }
         else {
