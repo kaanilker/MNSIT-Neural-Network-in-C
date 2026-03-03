@@ -113,7 +113,7 @@ To prevent accuracy regression from bad updates:
 - Hidden Layer Neurons: 256
 - Activation Functions: ReLU (hidden), Sigmoid (output)
 
-Achieved test accuracy with these settings: **%98.47**. Performance may vary slightly due to random weight initialization.
+Achieved test accuracy with these settings: **%98.49**. Performance may vary slightly due to random weight initialization.
 
 ## Implementation Details
 
