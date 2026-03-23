@@ -4,7 +4,7 @@ This repository contains a standalone implementation of a feed-forward neural ne
 
 ## Overview
 
-The project implements a complete neural network pipeline, including data loading, forward propagation, backpropagation, and evaluation. Every step is implemented manually to provide full transparency into how neural networks operate at a low level. The codebase has been refactored into a modular structure with separate functions for training and testing, and global variables for shared state across functions.
+The project implements a complete neural network pipeline, including data loading, forward propagation, backpropagation, and evaluation. Every step is implemented manually to provide full transparency into how neural networks operate at a low level. The codebase is organized into a modular structure across multiple source files, with shared function declarations in a dedicated header file.
 
 ## Technical Specifications
 
@@ -30,6 +30,39 @@ The following MNIST dataset files must be present in the project directory:
 
 These files can be downloaded from the official MNIST dataset source at https://www.kaggle.com/datasets/hojjatk/mnist-dataset
 
+## File Structure
+
+```
+├── mnsit.c           — Main program, training and inference logic
+├── requirements.h    — Header file: static inline activation functions + function prototypes
+├── requirements.c    — Implementations: weight init, bias init, data loading, zero-fill
+├── train-images.idx3-ubyte
+├── train-labels.idx1-ubyte
+├── t10k-images.idx3-ubyte
+└── t10k-labels.idx1-ubyte
+```
+
+### `requirements.h`
+Contains:
+- `static inline` definitions of all activation functions and their derivatives (`sigmoid`, `sigmoidTurev`, `relu`, `reluTurev`) — inlined directly at call sites for zero function-call overhead
+- Prototypes for all utility functions defined in `requirements.c`
+
+### `requirements.c`
+Contains implementations of:
+- `agirlikDoldurma` — He initialization for weight matrices
+- `biasDoldurma` — Zero initialization for bias arrays
+- `diziSifirlama` — Zero-fills a 1D float array
+- `matrisSifirlama` — Zero-fills a 2D float matrix
+- `goruntuOkuma` — Reads and normalizes image data from MNIST binary format
+- `etiketOkuma` — Reads label data from MNIST binary format
+
+### `mnsit.c`
+Contains:
+- Global variable declarations (weights, biases, neuron arrays, hyperparameters)
+- `egitimAlgoritmasi()` — Full training loop
+- `sonTestAlgoritmasi()` — Final inference on last 10 test samples
+- `main()` — Entry point
+
 ## Installation and Compilation
 
 The implementation depends only on standard C libraries:
@@ -39,13 +72,13 @@ The implementation depends only on standard C libraries:
 - `math.h`
 - `omp.h` (for parallel processing support via OpenMP)
 
-Since mathematical functions are used, the math library must be linked explicitly.
-
 **Compile (Linux / Unix):**
 
 ```bash
-gcc mnsit.c -o mnsit -lm -fopenmp -O3 -ffast-math -march=native
+gcc mnsit.c requirements.c -o mnsit -lm -fopenmp -O3 -ffast-math -march=native
 ```
+
+Both source files must be passed to the compiler. The `-lm` flag links the math library, `-fopenmp` enables parallelism, and `-O3 -ffast-math -march=native` enable full optimization.
 
 ## Execution
 
@@ -64,7 +97,7 @@ The model uses the following hyperparameters defined at global scope (configurab
 - **Learning Rate Decay (Gamma):** 0.9
 - **Hidden Layer Neurons:** 256
 
-These can be modified by changing the `#define` directives and the global variable declaration in the code:
+These can be modified by changing the `#define` directives and the global variable declaration in `mnsit.c`:
 
 ```c
 float learningRate = 0.07;
@@ -119,10 +152,10 @@ Achieved test accuracy with these settings: **%98.49**. Performance may vary sli
 
 The project includes manual implementations of:
 
-- **Binary file parsing** of MNIST `.idx3-ubyte` and `.idx1-ubyte` formats
+- **Binary file parsing** of MNIST `.idx3-ubyte` and `.idx1-ubyte` formats via `goruntuOkuma` and `etiketOkuma`
 - **Input normalization** (pixel values scaled from 0–255 to 0.0–1.0)
-- **He initialization** for weights (ReLU-optimized)
-- **Activation functions:** ReLU (hidden layer) and Sigmoid (output layer) with their derivatives
+- **He initialization** for weights via `agirlikDoldurma` (thread-safe, no OpenMP on `rand()`)
+- **Activation functions:** `static inline` ReLU and Sigmoid with their derivatives, inlined at compile time for maximum performance
 - **Forward propagation** with matrix-vector operations, parallelized via OpenMP
 - **Backpropagation** with proper gradient computation through ReLU and Sigmoid, parallelized via OpenMP
 - **Weight update loops** parallelized via OpenMP for additional throughput
@@ -133,36 +166,44 @@ The project includes manual implementations of:
 
 ## Code Structure
 
-All weights, biases, neuron arrays, backup arrays, and hyperparameters are declared as **global variables**, allowing them to be shared seamlessly between the modular functions without passing large arrays as arguments.
+All weights, biases, neuron arrays, backup arrays, and hyperparameters are declared as **global variables** in `mnsit.c`, allowing them to be shared seamlessly between modular functions without passing large arrays as arguments.
 
 The implementation is organized into the following functions:
 
-### `egitimAlgoritmasi()`
+### `egitimAlgoritmasi()` — in `mnsit.c`
 Handles the full training loop across all epochs:
 - Adaptive learning rate decay based on accuracy improvement thresholds (epochs 1–10 vs. 11+)
 - Weight rollback to backup if accuracy regresses
 - Forward propagation through hidden (ReLU) and output (Sigmoid) layers — all major loops parallelized with `#pragma omp parallel for schedule(static)`
 - Error computation using one-hot encoded targets
-- Backpropagation with gradient calculation — all independent loops parallelized with `#pragma omp parallel for schedule(static)`
-- Weight and bias updates using computed gradients — update loops also parallelized
-- Progress logging every 10,000 samples and current learning rate printed at each epoch start
+- Backpropagation with gradient calculation — all independent loops parallelized
+- Weight and bias updates using computed gradients
+- Progress logging every 10,000 samples
 - Per-epoch evaluation on the full test set with accuracy reporting
 - Weight checkpointing when accuracy improves
 
-### `sonTestAlgoritmasi()`
+### `sonTestAlgoritmasi()` — in `mnsit.c`
 Runs inference on the last 10 test images (9990–9999) and prints:
 - Predicted class and ground truth label
 - Full output probability vector
 - Correctness indicator (EVET/HAYIR)
 
-### `main()`
+### `main()` — in `mnsit.c`
 Entry point responsible for:
-1. Opening and reading the four MNIST binary files
+1. Opening the four MNIST binary files
 2. Skipping file headers via dummy reads
-3. Loading and normalizing image data
-4. Initializing weights (He initialization) and biases — weight initialization loops parallelized with OpenMP
+3. Loading and normalizing image and label data via `goruntuOkuma` and `etiketOkuma`
+4. Initializing weights via `agirlikDoldurma` and biases via `biasDoldurma`
 5. Calling `egitimAlgoritmasi()`
 6. Calling `sonTestAlgoritmasi()`
+
+### Utility functions — in `requirements.c`
+- `agirlikDoldurma` — He-initialized random weight filling
+- `biasDoldurma` — Zero-fills bias arrays
+- `diziSifirlama` — Zero-fills 1D float arrays
+- `matrisSifirlama` — Zero-fills 2D float matrices
+- `goruntuOkuma` — MNIST image file reader + normalizer
+- `etiketOkuma` — MNIST label file reader
 
 ## Evaluation Metrics
 
@@ -175,23 +216,18 @@ Accuracy is calculated as:
 Accuracy = (Number of Correct Predictions / Total Test Samples) × 100
 ```
 
-Error rate can be derived as:
-```
-Error Rate = 100 - Accuracy
-```
-
 ## Purpose
 
 This project is intended for **educational purposes**. It prioritizes clarity and low-level understanding over performance or scalability, making it ideal for:
 
 - Learning neural network internals without abstraction
 - Understanding backpropagation mathematics and gradient descent
+- Seeing how modular C project structure works in practice
 - Seeing how adaptive learning rate scheduling affects convergence
 - Observing per-epoch training dynamics and model improvement
 - Understanding activation functions and their derivatives
 - Studying the impact of weight checkpointing and rollback strategies
 - Benchmarking against higher-level frameworks
-- Studying the impact of hyperparameter choices
 
 ## Potential Improvements
 
