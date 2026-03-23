@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <math.h>
 #include <omp.h>
+#include "requirements.h"
 
 // Model Hiperparametreleri
 float learningRate = 0.07;
 #define epoch 25
 #define gamma 0.9
 #define hiddenLayer 256
-// #define batchSize 64
+#define batchSize 64
 
 // Resimler ve Etiketlerin Matrisleri
 float resimler[60000][784];
@@ -16,13 +17,11 @@ int etiketler[60000];
 float resimlerTest[10000][784];
 int etiketlerTest[10000];
 
-// Ağırlık ve Bias Matrislerinin OLuşturulması
+// Ağırlık ve Bias Matrislerinin ve Yedeklerinin OLuşturulması
 float agirliklar1[hiddenLayer][784];
 float agirliklar2[10][hiddenLayer];
 float bias1[hiddenLayer];
 float bias2[10];
-
-// Yedek Ağırlık ve Bias Matrislerinin Oluşturulması
 float agirliklar1Yedek[hiddenLayer][784];
 float agirliklar2Yedek[10][hiddenLayer];
 float bias1Yedek[hiddenLayer];
@@ -32,28 +31,6 @@ float bias2Yedek[10];
 /* float girdi[784]; Bu dizi ileride resim okuma eklendiğinde çalışacaktır. */
 float birinciKatman[hiddenLayer];
 float ikinciKatman[10];
-
-// Sigmoid ve ReLU Aktivasyon Fonksiyonu ve Türevi
-float sigmoid(float x) {
-return 1.0f / (1.0f + expf(-x));
-}
-float sigmoidTurev(float x) {
-return x*(1-x);
-}
-float relu(float x) {
-    if (x<=0) {
-        return 0;
-    } else {
-        return x;
-    }
-}
-float reluTurev(float x) {
-    if (x<=0) {
-        return 0;
-    } else {
-        return 1;
-    }
-}
 
 // Öğrenme Değişkenliği
 int guncelTahmin = 0;
@@ -259,7 +236,6 @@ void sonTestAlgoritmasi () {
 }
 
 int main () { 
-
     // Dosyaların Belirlenmesi
     FILE *goruntuDosyasi;
     FILE *etiketDosyasi;
@@ -278,64 +254,20 @@ int main () {
     fread(sahteOkuma, 1, 8, etiketTestDosyasi);
     
     // Dosyaların Okunup Değişken İçine Atanması
-    for(int a=0; a<60000; a=a+1) {
-        unsigned char geciciDizi[784];
-        fread(geciciDizi,1,784,goruntuDosyasi);
-
-        for (int b=0; b<784; b=b+1) {
-        resimler[a][b] = (float)geciciDizi[b]/255.0;
-        } 
-    }
-    for(int a=0; a<60000; a=a+1) {
-        unsigned char geciciDizi;
-        fread(&geciciDizi,1,1,etiketDosyasi);
-
-        etiketler[a] = (int)geciciDizi;
-    }
-    for(int a=0; a<10000; a=a+1) {
-        unsigned char geciciDizi[784];
-        fread(geciciDizi,1,784,goruntuTestDosyasi);
-
-        for (int b=0; b<784; b=b+1) {
-        resimlerTest[a][b] = (float)geciciDizi[b]/255.0;
-        } 
-    }
-    for(int a=0; a<10000; a=a+1) {
-        unsigned char geciciDizi;
-        fread(&geciciDizi,1,1,etiketTestDosyasi);
-
-        etiketlerTest[a] = (int)geciciDizi;
-    }
+    goruntuOkuma(goruntuDosyasi, resimler, 60000);
+    etiketOkuma(etiketDosyasi, etiketler, 60000);
+    goruntuOkuma(goruntuTestDosyasi, resimlerTest, 10000);
+    etiketOkuma(etiketTestDosyasi, etiketlerTest, 10000);
 
     // Ağırlık Matrislerinin Doldurulması
-    #pragma omp parallel for schedule(static)
-    for (int a=0; a<hiddenLayer; a=a+1) {
-        #pragma omp parallel for schedule(static)
-        for(int b=0; b<784; b=b+1) {
-            float std = sqrtf(2.0f / 784.0f);
-            agirliklar1[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
-        }
-    }
-    #pragma omp parallel for schedule(static)
-    for (int a=0; a<10; a=a+1) {
-        #pragma omp parallel for schedule(static)
-        for(int b=0; b<hiddenLayer; b=b+1) {
-            float std = sqrtf(2.0f / (float)hiddenLayer);
-            agirliklar2[a][b] = ((float)rand() / RAND_MAX - 0.5) * 2 * std;
-        }
-    }
-
-    // Bias Matrislerinin Doldurulması
-    for (int a=0; a<hiddenLayer; a=a+1) {
-            bias1[a] = ((float)rand() / RAND_MAX - 0.5) * 0.01;
-    }
-    for (int a=0; a<10; a=a+1) {
-            bias2[a] = ((float)rand() / RAND_MAX - 0.5) * 0.01;
-    }
+    agirlikDoldurma(&agirliklar1[0][0], hiddenLayer, 784);
+    agirlikDoldurma(&agirliklar2[0][0], 10, hiddenLayer);
+    biasDoldurma(bias1, hiddenLayer);
+    biasDoldurma(bias2, 10);
 
     // Öğrenme Algoritması
     egitimAlgoritmasi();
 
     // Son 10 Tahmin Test Algoritması
-    sonTestAlgoritmasi ();
+    sonTestAlgoritmasi();
 }
